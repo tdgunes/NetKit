@@ -1,4 +1,255 @@
 
+// var nkit = NetKit() // (async=true) optional
+// var nkit = NetKit(baseURL:”http://google.com/”)
+
+// HTTP Method
+
+
+
+// nkit.request(type:.POST,
+
+// nkit.addHeader(“Content-Type, “application/json”)
+
+// nkit.post(url:“/api/associated/”, headers: ["Content-Type":"application/json"], data:: // optional 
+
+// nkit.put
+// nkit.delete
+// nkit.get
+
+// HTTP_511_NETWORK_AUTHENTICATION_REQUIRED = 511
+
+
+enum HTTPMethod: String {
+    case POST = "POST"
+    case DELETE = "DELETE"
+    case GET = "GET"
+    case PUT = "PUT"
+}
+
+enum HTTPStatus: Int {
+    case Continue = 100
+    case SwitchingProtocols = 101
+    case Processing = 102
+    
+    // Success
+    case OK = 200
+    case Created = 201
+    case Accepted = 202
+    case NonAuthoritativeInformation = 203
+    case NoContent = 204
+    case ResetContent = 205
+    case PartialContent = 206
+    case MultiStatus = 207
+    case AlreadyReported = 208
+    case IMUsed = 226
+    
+    // Redirections
+    case MultipleChoices = 300
+    case MovedPermanently = 301
+    case Found = 302
+    case SeeOther = 303
+    case NotModified = 304
+    case UseProxy = 305
+    case SwitchProxy = 306
+    case TemporaryRedirect = 307
+    case PermanentRedirect = 308
+    
+    // Client Errors
+    case BadRequest = 400
+    case Unauthorized = 401
+    case PaymentRequired = 402
+    case Forbidden = 403
+    case NotFound = 404
+    case MethodNotAllowed = 405
+    case NotAcceptable = 406
+    case ProxyAuthenticationRequired = 407
+    case RequestTimeout = 408
+    case Conflict = 409
+    case Gone = 410
+    case LengthRequired = 411
+    case PreconditionFailed = 412
+    case RequestEntityTooLarge = 413
+    case RequestURITooLong = 414
+    case UnsupportedMediaType = 415
+    case RequestedRangeNotSatisfiable = 416
+    case ExpectationFailed = 417
+    case ImATeapot = 418
+    case AuthenticationTimeout = 419
+    case UnprocessableEntity = 422
+    case Locked = 423
+    case FailedDependency = 424
+    case UpgradeRequired = 426
+    case PreconditionRequired = 428
+    case TooManyRequests = 429
+    case RequestHeaderFieldsTooLarge = 431
+    case LoginTimeout = 440
+    case NoResponse = 444
+    case RetryWith = 449
+    case UnavailableForLegalReasons = 451
+    case RequestHeaderTooLarge = 494
+    case CertError = 495
+    case NoCert = 496
+    case HTTPToHTTPS = 497
+    case TokenExpired = 498
+    case ClientClosedRequest = 499
+    
+    // Server Errors
+    case InternalServerError = 500
+    case NotImplemented = 501
+    case BadGateway = 502
+    case ServiceUnavailable = 503
+    case GatewayTimeout = 504
+    case HTTPVersionNotSupported = 505
+    case VariantAlsoNegotiates = 506
+    case InsufficientStorage = 507
+    case LoopDetected = 508
+    case BandwidthLimitExceeded = 509
+    case NotExtended = 510
+    case NetworkAuthenticationRequired = 511
+    case NetworkTimeoutError = 599
+}
+
+enum NKError: Int {
+    case MalformedURL = 0
+    case HasNSError = 1
+}
+
+enum NKContentType: String  {
+    //common aplication content types
+    case JSON = "application/json"
+    case XML = "application/xml"
+    case ZIP = "application/zip"
+    case GZIP = "application/gzip"
+    case PDF = "application/pdf"
+
+    //common image content types
+    case JPEG = "image/jpeg"
+    case PNG = "image/png"
+    case TIFF = "image/tiff"
+    case BMP = "image/bmp"
+    case GIF = "image/gif"
+
+    //common audio content types
+    case MP4Audio = "audio/mp4"
+    case OGG = "audio/ogg"
+    case FLAC = "audio/flac"
+    case WEBMAudio = "audio/webm"
+
+    //common text content types
+    case HTML = "text/html"
+    case JAVASCRIPT ="text/javascript"
+    case PLAIN = "text/plain"
+    case RTF = "text/rtf"
+    case XMLText = "text/xml"
+    case CSV = "text/csv"
+    
+    //common video content types
+    case AVI = "video/avi"
+    case MPEG = "video/mpeg"
+    case MP4Video = "video/mp4"
+    case QuickTime = "video/quicktime"
+    case WEBMVideo = "video/webm"
+}
+protocol NKDelegate {
+    func didFailed(nkerror:NKError, nserror:NSError?)
+    func didSucceed(response:NSMutableData)
+}
+
+typealias CompletionHandler = (NSMutableData)->()
+typealias ErrorHandler = (NKError, NSError?)->()
+
+class NetKit: HTTPLayerDelegate {
+    
+
+    let urlBase: String = ""
+    var timeoutInterval = 20.0 //seconds
+    var delegate: HTTPLayerDelegate?
+
+
+    init(urlBase: String) {
+        self.urlBase = urlBase
+    }
+
+    init(){
+
+    }
+
+    func request(type: HTTPMethod, url: String?=nil, headers: [String:String]?=nil) {
+        var fullURL = self.getFullURL(url)
+    }
+
+    func put(url: String?=nil, headers: [String:String]?=nil) {
+        var fullURL = self.getFullURL(url)
+    }
+
+    func get(url: String?=nil, headers: [String:String]?=nil) {
+        var fullURL = self.getFullURL(url)
+    }
+
+    func post(data: AnyObject, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler, errorHandler: ErrorHandler) { //contentType, postData
+        var fullURL = self.getFullURL(url)
+     
+        if let request = self.generateURLRequest(fullURL, HTTPMethod.POST) {
+            if let concreteData = data {
+                let type = self.detectDataType(concreteData)
+                self.setContentType(request, type)
+                request.HTTPBody = data.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
+            }          
+            var httpLayer = HTTPLayer()
+            httpLayer.delegate = self
+            httpLayer.request(request)
+        }
+    }
+    func delete(url: String?=nil, headers: [String:String]?=nil=nil) {
+        var fullURL = self.getFullURL(url)
+    }
+
+    // MARK: HTTPLayerDelegate functions
+    func requestDidFinish(response:NSMutableData) {
+        self.delegate?.didSucceed(response)
+
+    }
+
+    func requestFailWithError(error:NSError) {
+        self.delegate?.didFailed(.HasNSError, nserror:error)
+    }
+    
+
+
+
+    private func getFullURL(url: String?) -> String {
+        if let concreteURL = url {
+            return self.baseURL + concreteURL
+        }
+        return self.baseURL
+    }
+
+    private func setContentType(request: NSMutableURLRequest, type: NKContentType) {
+        request.setValue("Content-Type",  forHTTPHeaderField:type.rawValue)
+    }
+
+    private func detectDataType(data: AnyObject) -> NKContentType? {
+        if let json = data as? JSON {
+            return NKContentType.JSON
+        }
+        return nil 
+    }
+
+    private func generateURLRequest(absoluteURL: String, method: HTTPMethod) -> NSMutableURLRequest? {
+        if let url = NSURL(string: absoluteURL) {
+            var request =  NSMutableURLRequest(URL: url)
+            request.timeoutInterval = timeoutInterval
+            request.HTTPMethod = method.rawValue
+            return request
+        }
+        self.delegate?.didFail(.MalformedURL, nserror:nil)
+        return nil
+    }
+
+
+}
+
+
 //
 //  Logger.swift
 //  GeoPolicy - Socivy
@@ -6,7 +257,6 @@
 //  Created by Taha Doğan Güneş on 10/06/15.
 //  Copyright (c) 2015 Taha Doğan Güneş. All rights reserved.
 //
-
 
 import Foundation
 
@@ -26,6 +276,10 @@ class Logger {
 }
 
 
+
+
+
+
 //
 //  LowLevelLayer.swift
 //  GeoPolicy - Socivy
@@ -35,13 +289,13 @@ class Logger {
 //
 
 
-protocol LowLevelLayerDelegate {
+protocol HTTPLayerDelegate {
     func requestFailWithError(error:NSError)
     func requestDidFinish(response:NSMutableData)
 }
 
 
-class LowLevelLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate {
+class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate {
     
     var responseData : NSMutableData = NSMutableData()
     var delegate: LowLevelLayerDelegate?
@@ -76,11 +330,6 @@ class LowLevelLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDeleg
 //
 
 
-enum HTTPMethod: String {
-    case POST = "POST"
-    case DELETE = "DELETE"
-    case GET = "GET"
-}
 
 protocol NetworkLibraryDelegate {
     func requestFailWithError(errorCode:NetworkLibraryErrorCode, error:NSError?)
@@ -114,6 +363,10 @@ class NetworkLibrary : LowLevelLayerDelegate{
         self.headers = headers
         self.postData = postData
         self.httpMethod = httpMethod
+    }
+
+    init(url: String){
+        self.url = url
     }
     
     func request(){
@@ -158,21 +411,17 @@ class NetworkLibrary : LowLevelLayerDelegate{
                     urlRequest.setValue(value, forHTTPHeaderField: key)
                 }
             }
-
-            
             return urlRequest
         }
         
         self.delegate?.requestFailWithError(NetworkLibraryErrorCode.MalformedURL, error:nil)
         return nil
     }
-
-    
+  
     deinit{
         Logger.sharedInstance.log(tag, message: "Bye")
         
     }
-    
 }
 
 //
