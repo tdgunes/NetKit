@@ -137,7 +137,7 @@ enum NKContentType: String  {
 
     //common text content types
     case HTML = "text/html"
-    case JAVASCRIPT ="text/javascript"
+    case JAVASCRIPT = "text/javascript"
     case PLAIN = "text/plain"
     case RTF = "text/rtf"
     case XMLText = "text/xml"
@@ -150,6 +150,7 @@ enum NKContentType: String  {
     case QuickTime = "video/quicktime"
     case WEBMVideo = "video/webm"
 }
+
 protocol NKDelegate {
     func didFailed(nkerror:NKError, nserror:NSError?)
     func didSucceed(response:NSMutableData)
@@ -161,17 +162,17 @@ typealias ErrorHandler = (NKError, NSError?)->()
 class NetKit: HTTPLayerDelegate {
     
 
-    let urlBase: String = ""
+    let baseURL: String
     var timeoutInterval = 20.0 //seconds
-    var delegate: HTTPLayerDelegate?
+    var delegate: NKDelegate?
 
 
-    init(urlBase: String) {
-        self.urlBase = urlBase
+    init(baseURL: String) {
+        self.baseURL = baseURL
     }
 
     init(){
-
+        self.baseURL = ""
     }
 
     func request(type: HTTPMethod, url: String?=nil, headers: [String:String]?=nil) {
@@ -186,21 +187,23 @@ class NetKit: HTTPLayerDelegate {
         var fullURL = self.getFullURL(url)
     }
 
-    func post(data: AnyObject, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler, errorHandler: ErrorHandler) { //contentType, postData
+    func post(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) { //contentType, postData
         var fullURL = self.getFullURL(url)
      
-        if let request = self.generateURLRequest(fullURL, HTTPMethod.POST) {
-            if let concreteData = data {
-                let type = self.detectDataType(concreteData)
-                self.setContentType(request, type)
-                request.HTTPBody = data.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
+        if let request = self.generateURLRequest(fullURL, method: HTTPMethod.POST) {
+            if let concreteData: AnyObject = data {
+                if let type = self.detectDataType(concreteData) {
+                    self.setContentType(request, type)
+                }
+
+                request.HTTPBody = concreteData.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
             }          
             var httpLayer = HTTPLayer()
             httpLayer.delegate = self
             httpLayer.request(request)
         }
     }
-    func delete(url: String?=nil, headers: [String:String]?=nil=nil) {
+    func delete(url: String?=nil, headers: [String:String]?=nil) {
         var fullURL = self.getFullURL(url)
     }
 
@@ -213,9 +216,6 @@ class NetKit: HTTPLayerDelegate {
     func requestFailWithError(error:NSError) {
         self.delegate?.didFailed(.HasNSError, nserror:error)
     }
-    
-
-
 
     private func getFullURL(url: String?) -> String {
         if let concreteURL = url {
@@ -224,7 +224,7 @@ class NetKit: HTTPLayerDelegate {
         return self.baseURL
     }
 
-    private func setContentType(request: NSMutableURLRequest, type: NKContentType) {
+    private func setContentType(request: NSMutableURLRequest, _ type: NKContentType) {
         request.setValue("Content-Type",  forHTTPHeaderField:type.rawValue)
     }
 
@@ -242,7 +242,7 @@ class NetKit: HTTPLayerDelegate {
             request.HTTPMethod = method.rawValue
             return request
         }
-        self.delegate?.didFail(.MalformedURL, nserror:nil)
+        self.delegate?.didFailed(.MalformedURL, nserror:nil)
         return nil
     }
 
@@ -298,7 +298,7 @@ protocol HTTPLayerDelegate {
 class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate {
     
     var responseData : NSMutableData = NSMutableData()
-    var delegate: LowLevelLayerDelegate?
+    var delegate: HTTPLayerDelegate?
     
     func request(urlRequest:NSMutableURLRequest){
         let conn = NSURLConnection(request:urlRequest, delegate: self, startImmediately: true)
@@ -329,100 +329,6 @@ class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate 
 //  Copyright (c) 2015 Taha Doğan Güneş. All rights reserved.
 //
 
-
-
-protocol NetworkLibraryDelegate {
-    func requestFailWithError(errorCode:NetworkLibraryErrorCode, error:NSError?)
-    func requestDidFinish(response:NSMutableData)
-}
-enum NetworkLibraryErrorCode: Int {
-    case MalformedURL = 0
-    case HasNSError = 1
-}
-
-class NetworkLibrary : LowLevelLayerDelegate{
-    // configuration
-    let tag = "nlib"
-    let timeoutInterval = 20.0 // seconds
-    var delegate : NetworkLibraryDelegate?
-    
-    // request details
-    var url:String
-    var httpMethod:HTTPMethod
-    var responseData : NSMutableData? = NSMutableData()
-    var headers:[String:String]?
-    var postData:String?
-    
-    
-    // handlers
-    var completionHandler:((response:NSMutableData)->())?
-    var errorHandler:((error:NSError, errorCode:NetworkLibraryErrorCode)->Void)?
-    
-    init(url:String, headers:[String:String]?, postData:String?, httpMethod:HTTPMethod){
-        self.url = url
-        self.headers = headers
-        self.postData = postData
-        self.httpMethod = httpMethod
-    }
-
-    init(url: String){
-        self.url = url
-    }
-    
-    func request(){
-        var lowLevelLayer = LowLevelLayer()
-        lowLevelLayer.delegate = self
-        if let urlRequest = self.generateHTTPRequest(){
-            lowLevelLayer.request(urlRequest)
-        }
-    }
-    
-    func requestDidFinish(response: NSMutableData) {
-        self.delegate?.requestDidFinish(response)
-        if let handler = self.completionHandler {
-            handler(response: response)
-        }
-    }
-    
-    func requestFailWithError(error: NSError) {
-        self.delegate?.requestFailWithError(.HasNSError, error:error)
-        if let handler = self.errorHandler {
-            handler(error: error, errorCode: .HasNSError)
-        }
-    }
-    
-    func generateHTTPRequest() -> NSMutableURLRequest? {
-        Logger.sharedInstance.log(tag, message: url)
-        
-        if let url = NSURL(string:self.url){
-            var urlRequest = NSMutableURLRequest(URL: url)
-            
-            urlRequest.timeoutInterval = timeoutInterval
-            urlRequest.HTTPMethod = self.httpMethod.rawValue
-            if let data = self.postData{
-                Logger.sharedInstance.log(tag, message: "HTTP Body: '\(data)'")
-                urlRequest.HTTPBody = data.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
-            }
-            Logger.sharedInstance.log(tag, message: "HTTP Method: '\(self.httpMethod.rawValue)'")
-            
-            if let concreteHeaders = self.headers {
-                for (key,value) in concreteHeaders {
-                    Logger.sharedInstance.log(tag, message: "$\(self.httpMethod.rawValue)['\(key)'] = '\(value)'")
-                    urlRequest.setValue(value, forHTTPHeaderField: key)
-                }
-            }
-            return urlRequest
-        }
-        
-        self.delegate?.requestFailWithError(NetworkLibraryErrorCode.MalformedURL, error:nil)
-        return nil
-    }
-  
-    deinit{
-        Logger.sharedInstance.log(tag, message: "Bye")
-        
-    }
-}
 
 //
 //  JSON.swift

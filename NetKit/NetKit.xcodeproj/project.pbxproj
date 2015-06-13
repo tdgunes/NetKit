@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3D0F76BB1B2C560E007CBBFD /* NetKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2284191B28CF5C0023BEBB /* NetKit.swift */; };
 		3D2283FA1B28CF390023BEBB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2283F91B28CF390023BEBB /* AppDelegate.swift */; };
 		3D2283FC1B28CF390023BEBB /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D2283FB1B28CF390023BEBB /* ViewController.swift */; };
 		3D2283FF1B28CF390023BEBB /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 3D2283FD1B28CF390023BEBB /* Main.storyboard */; };
@@ -225,6 +226,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3D0F76BB1B2C560E007CBBFD /* NetKit.swift in Sources */,
 				3D2284101B28CF390023BEBB /* NetKitTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -415,6 +417,7 @@
 				3D2284151B28CF390023BEBB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		3D2284161B28CF390023BEBB /* Build configuration list for PBXNativeTarget "NetKitTests" */ = {
 			isa = XCConfigurationList;
@@ -423,6 +426,7 @@
 				3D2284181B28CF390023BEBB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
