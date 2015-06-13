@@ -29,9 +29,10 @@ class NetKitTests: XCTestCase {
         let url = "https://api.github.com/gists/5d8d25e603fcac6bb65f"
         nkit!.baseURL = url
         nkit!.get(completionHandler: {
-            response in 
+            response in
+                XCTAssert(HTTPStatus.OK == response.status, "Status Check")
                 if let id = response.json!["id"].asString {
-                    XCTAssert(id == "5d8d25e603fcac6bb65f", "Correct id!")
+                    XCTAssert(id == "5d8d25e603fcac6bb65f", "ID Check")
                     return
                 }
             
