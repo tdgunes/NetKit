@@ -153,16 +153,23 @@ enum NKContentType: String  {
 
 protocol NKDelegate {
     func didFailed(nkerror:NKError, nserror:NSError?)
-    func didSucceed(response:NSMutableData)
+    func didSucceed(response:NKResponse)
 }
 
-typealias CompletionHandler = (NSMutableData)->()
+typealias CompletionHandler = (NKResponse)->()
 typealias ErrorHandler = (NKError, NSError?)->()
+
+class NKResponse {
+    var json: JSON?
+    var status: HTTPStatus?
+    var data: NSMutableData?
+    var string: String?
+}
 
 class NetKit: HTTPLayerDelegate {
     
 
-    let baseURL: String
+    var baseURL: String
     var timeoutInterval = 20.0 //seconds
     var delegate: NKDelegate?
 
@@ -175,22 +182,29 @@ class NetKit: HTTPLayerDelegate {
         self.baseURL = ""
     }
 
-    func request(type: HTTPMethod, url: String?=nil, headers: [String:String]?=nil) {
+    func request(type: HTTPMethod, url: String?=nil, data: AnyObject? = nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
         var fullURL = self.getFullURL(url)
+        switch type {
+        case .POST:
+            self.post(data: data, url:url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            break
+        case .PUT:
+            self.put(data: data, url:url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            break
+        case .GET:
+            self.get(url: url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            break
+        case .DELETE:
+            self.delete(url: url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            break
+        }
     }
 
-    func put(url: String?=nil, headers: [String:String]?=nil) {
+    func put(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
         var fullURL = self.getFullURL(url)
-    }
 
-    func get(url: String?=nil, headers: [String:String]?=nil) {
-        var fullURL = self.getFullURL(url)
-    }
-
-    func post(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) { //contentType, postData
-        var fullURL = self.getFullURL(url)
-     
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.POST) {
+            self.setHeaders(request, headers)
             if let concreteData: AnyObject = data {
                 if let type = self.detectDataType(concreteData) {
                     self.setContentType(request, type)
@@ -198,17 +212,54 @@ class NetKit: HTTPLayerDelegate {
 
                 request.HTTPBody = concreteData.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
             }          
-            var httpLayer = HTTPLayer()
+            var httpLayer = HTTPLayer(completionHandler, errorHandler)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
     }
-    func delete(url: String?=nil, headers: [String:String]?=nil) {
+
+    func get(url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
         var fullURL = self.getFullURL(url)
+
+        if let request = self.generateURLRequest(fullURL, method: HTTPMethod.GET) {
+            self.setHeaders(request, headers)
+            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            httpLayer.delegate = self
+            httpLayer.request(request)
+        }
+    }
+
+    func post(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) { //contentType, postData
+        var fullURL = self.getFullURL(url)
+     
+        if let request = self.generateURLRequest(fullURL, method: HTTPMethod.POST) {
+            self.setHeaders(request, headers)
+            if let concreteData: AnyObject = data {
+                if let type = self.detectDataType(concreteData) {
+                    self.setContentType(request, type)
+                }
+
+                request.HTTPBody = concreteData.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
+            }          
+            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            httpLayer.delegate = self
+            httpLayer.request(request)
+        }
+    }
+
+    func delete(url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
+        var fullURL = self.getFullURL(url)
+
+        if let request = self.generateURLRequest(fullURL, method: HTTPMethod.DELETE) {
+            self.setHeaders(request, headers)
+            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            httpLayer.delegate = self
+            httpLayer.request(request)
+        }
     }
 
     // MARK: HTTPLayerDelegate functions
-    func requestDidFinish(response:NSMutableData) {
+    func requestDidFinish(response:NKResponse) {
         self.delegate?.didSucceed(response)
 
     }
@@ -217,11 +268,19 @@ class NetKit: HTTPLayerDelegate {
         self.delegate?.didFailed(.HasNSError, nserror:error)
     }
 
+
     private func getFullURL(url: String?) -> String {
         if let concreteURL = url {
             return self.baseURL + concreteURL
         }
         return self.baseURL
+    }
+    private func setHeaders(request:NSMutableURLRequest, _ headers: [String:String]? ) {
+       if let concreteHeaders = headers {
+            for (key,value) in concreteHeaders {
+                request.setValue(value, forHTTPHeaderField: key)
+            }
+        }
     }
 
     private func setContentType(request: NSMutableURLRequest, _ type: NKContentType) {
@@ -291,7 +350,7 @@ class Logger {
 
 protocol HTTPLayerDelegate {
     func requestFailWithError(error:NSError)
-    func requestDidFinish(response:NSMutableData)
+    func requestDidFinish(response:NKResponse)
 }
 
 
@@ -299,13 +358,24 @@ class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate 
     
     var responseData : NSMutableData = NSMutableData()
     var delegate: HTTPLayerDelegate?
-    
+    var completionHandler: CompletionHandler?
+    var errorHandler: ErrorHandler?
+    var status: HTTPStatus?
+
+    init(_ completionHandler: CompletionHandler?, _ errorHandler: ErrorHandler?) {
+        self.completionHandler = completionHandler
+        self.errorHandler = errorHandler
+    }
+
+
     func request(urlRequest:NSMutableURLRequest){
         let conn = NSURLConnection(request:urlRequest, delegate: self, startImmediately: true)
     }
     
     func connection(connection: NSURLConnection, didReceiveResponse response: NSURLResponse) {
         responseData = NSMutableData()
+        let httpResponse = response as! NSHTTPURLResponse
+        status = HTTPStatus(rawValue: httpResponse.statusCode)
     }
     
     func connection(connection: NSURLConnection, didReceiveData data: NSData) {
@@ -313,12 +383,28 @@ class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate 
     }
     
     func connectionDidFinishLoading(connection: NSURLConnection) {
-        self.delegate?.requestDidFinish(responseData)
+        var response = NKResponse()
+        response.status = self.status
+        response.data = responseData
+        if let string = NSString(data: responseData, encoding: NSUTF8StringEncoding) {
+            response.string = string as String
+            let json = JSON.loads(response.string!)
+            if !json.isError {
+                response.json = json
+            }
+            
+        }
+        self.delegate?.requestDidFinish(response)
+        if let handler = self.completionHandler {
+            handler(response)
+        }
     }
     func connection(connection: NSURLConnection, didFailWithError error: NSError) {
         self.delegate?.requestFailWithError(error)
+        if let handler = self.errorHandler {
+            handler(.HasNSError, error)
+        }
     }
-    
 }
 
 //

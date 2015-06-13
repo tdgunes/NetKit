@@ -24,6 +24,21 @@ class NetKitTests: XCTestCase {
         
         super.tearDown()
     }
+
+    func testGETGithub(){
+        let url = "https://api.github.com/gists/5d8d25e603fcac6bb65f"
+        nkit!.baseURL = url
+        nkit!.get(completionHandler: {
+            response in 
+                if let id = response.json!["id"].asString {
+                    XCTAssert(id == "5d8d25e603fcac6bb65f", "Correct id!")
+                    return
+                }
+            
+            XCTAssert(false, "Unexpected response!")
+        })
+
+    }
     
     func testGet() {
         nkit!.get()
