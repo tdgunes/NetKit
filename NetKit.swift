@@ -183,25 +183,25 @@ class NetKit: HTTPLayerDelegate {
     }
 
     func request(type: HTTPMethod, url: String?=nil, data: AnyObject? = nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
-        var fullURL = self.getFullURL(url)
+        let fullURL = self.getFullURL(url)
         switch type {
         case .POST:
-            self.post(data: data, url:url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            self.post(data, url:fullURL, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
             break
         case .PUT:
-            self.put(data: data, url:url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            self.put(data, url:fullURL, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
             break
         case .GET:
-            self.get(url: url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            self.get(fullURL, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
             break
         case .DELETE:
-            self.delete(url: url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            self.delete(fullURL, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
             break
         }
     }
 
     func put(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
-        var fullURL = self.getFullURL(url)
+        let fullURL = self.getFullURL(url)
 
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.POST) {
             self.setHeaders(request, headers)
@@ -212,25 +212,25 @@ class NetKit: HTTPLayerDelegate {
 
                 request.HTTPBody = concreteData.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
             }          
-            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            let httpLayer = HTTPLayer(completionHandler, errorHandler)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
     }
 
     func get(url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
-        var fullURL = self.getFullURL(url)
+        let fullURL = self.getFullURL(url)
 
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.GET) {
             self.setHeaders(request, headers)
-            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            let httpLayer = HTTPLayer(completionHandler, errorHandler)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
     }
 
     func post(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) { //contentType, postData
-        var fullURL = self.getFullURL(url)
+        let fullURL = self.getFullURL(url)
      
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.POST) {
             self.setHeaders(request, headers)
@@ -241,18 +241,18 @@ class NetKit: HTTPLayerDelegate {
 
                 request.HTTPBody = concreteData.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
             }          
-            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            let httpLayer = HTTPLayer(completionHandler, errorHandler)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
     }
 
     func delete(url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
-        var fullURL = self.getFullURL(url)
+        let fullURL = self.getFullURL(url)
 
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.DELETE) {
             self.setHeaders(request, headers)
-            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            let httpLayer = HTTPLayer(completionHandler, errorHandler)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
@@ -288,7 +288,7 @@ class NetKit: HTTPLayerDelegate {
     }
 
     private func detectDataType(data: AnyObject) -> NKContentType? {
-        if let json = data as? JSON {
+        if let _ = data as? JSON {
             return NKContentType.JSON
         }
         return nil 
@@ -296,7 +296,7 @@ class NetKit: HTTPLayerDelegate {
 
     private func generateURLRequest(absoluteURL: String, method: HTTPMethod) -> NSMutableURLRequest? {
         if let url = NSURL(string: absoluteURL) {
-            var request =  NSMutableURLRequest(URL: url)
+            let request =  NSMutableURLRequest(URL: url)
             request.timeoutInterval = timeoutInterval
             request.HTTPMethod = method.rawValue
             return request
@@ -326,7 +326,7 @@ class Logger {
     
     func log(object:AnyObject, message:String){
         if DEBUG {
-            println("[\(object)] \(message)")
+            print("[\(object)] \(message)")
         }
     }
     class var sharedInstance: Logger {
@@ -369,7 +369,7 @@ class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate 
 
 
     func request(urlRequest:NSMutableURLRequest){
-        let conn = NSURLConnection(request:urlRequest, delegate: self, startImmediately: true)
+        _ = NSURLConnection(request:urlRequest, delegate: self, startImmediately: true)
     }
     
     func connection(connection: NSURLConnection, didReceiveResponse response: NSURLResponse) {
@@ -383,7 +383,7 @@ class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate 
     }
     
     func connectionDidFinishLoading(connection: NSURLConnection) {
-        var response = NKResponse()
+        let response = NKResponse()
         response.status = self.status
         response.data = responseData
         if let string = NSString(data: responseData, encoding: NSUTF8StringEncoding) {
@@ -461,9 +461,14 @@ extension JSON {
     public convenience init(string:String) {
         var err:NSError?
         let enc:NSStringEncoding = NSUTF8StringEncoding
-        var obj:AnyObject? = NSJSONSerialization.JSONObjectWithData(
-            string.dataUsingEncoding(enc)!, options:nil, error:&err
-        )
+        var obj:AnyObject?
+        do {
+            obj = try NSJSONSerialization.JSONObjectWithData(
+                        string.dataUsingEncoding(enc)!, options:[])
+        } catch let error as NSError {
+            err = error
+            obj = nil
+        }
         self.init(err != nil ? err! : obj!)
     }
     /// parses string to the JSON object
@@ -474,39 +479,46 @@ extension JSON {
     public class func loads(string:String)->JSON {
         return JSON(string:string)
     }
-    /// constructs JSON object from the content of NSURL
-    public convenience init(nsurl:NSURL) {
-        var enc:NSStringEncoding = NSUTF8StringEncoding
-        var err:NSError?
-        let str:String? =
-        NSString(
-            contentsOfURL:nsurl, usedEncoding:&enc, error:&err
-        ) as String?
-        if err != nil { self.init(err!) }
-        else { self.init(string:str!) }
-    }
-    /// fetch the JSON string from NSURL and parse it
-    /// same as JSON(nsurl:NSURL)
-    public class func fromNSURL(nsurl:NSURL) -> JSON {
-        return JSON(nsurl:nsurl)
-    }
-    /// constructs JSON object from the content of URL
-    public convenience init(url:String) {
-        if let nsurl = NSURL(string:url) as NSURL? {
-            self.init(nsurl:nsurl)
-        } else {
-            self.init(NSError(
-                domain:"JSONErrorDomain",
-                code:400,
-                userInfo:[NSLocalizedDescriptionKey: "malformed URL"]
-                )
-            )
-        }
-    }
-    /// fetch the JSON string from URL in the string
-    public class func fromURL(url:String) -> JSON {
-        return JSON(url:url)
-    }
+// MARK: FIXME
+    
+//    /// constructs JSON object from the content of NSURL
+//    public convenience init(nsurl:NSURL) {
+//        var enc:NSStringEncoding = NSUTF8StringEncoding
+//        let err:NSError?
+//        var str:String?
+//        do {
+//            str = try NSString(contentsOfURL:nsurl, usedEncoding:&enc) as String?
+//        } catch {
+//            str = nil
+//        }
+//
+//
+//
+//        if err != nil { self.init(err!) }
+//        else { self.init(string:str!) }
+//    }
+//    /// fetch the JSON string from NSURL and parse it
+//    /// same as JSON(nsurl:NSURL)
+//    public class func fromNSURL(nsurl:NSURL) -> JSON {
+//        return JSON(nsurl:nsurl)
+//    }
+//    /// constructs JSON object from the content of URL
+//    public convenience init(url:String) {
+//        if let nsurl = NSURL(string:url) as NSURL? {
+//            self.init(nsurl:nsurl)
+//        } else {
+//            self.init(NSError(
+//                domain:"JSONErrorDomain",
+//                code:400,
+//                userInfo:[NSLocalizedDescriptionKey: "malformed URL"]
+//                )
+//            )
+//        }
+//    }
+//    /// fetch the JSON string from URL in the string
+//    public class func fromURL(url:String) -> JSON {
+//        return JSON(url:url)
+//    }
     /// does what JSON.stringify in ES5 does.
     /// when the 2nd argument is set to true it pretty prints
     public class func stringify(obj:AnyObject, pretty:Bool=false) -> String! {
@@ -518,7 +530,7 @@ extension JSON {
                 ))
             return nil
         }
-        return JSON(obj).toString(pretty:pretty)
+        return JSON(obj).toString(pretty)
     }
 }
 /// instance properties
@@ -526,7 +538,7 @@ extension JSON {
     /// access the element like array
     public subscript(idx:Int) -> JSON {
         switch _value {
-        case let err as NSError:
+        case  _ as NSError:
             return self
         case let ary as NSArray:
             if 0 <= idx && idx < ary.count {
@@ -547,7 +559,7 @@ extension JSON {
     /// access the element like dictionary
     public subscript(key:String)->JSON {
         switch _value {
-        case let err as NSError:
+        case  _ as NSError:
             return self
         case let dic as NSDictionary:
             if let val:AnyObject = dic[key] { return JSON(val) }
@@ -708,7 +720,7 @@ extension JSON {
         switch _value {
         case let o as NSDictionary:
             var result = [String:JSON]()
-            for (k:AnyObject, v:AnyObject) in o {
+            for (k, v): (AnyObject, AnyObject) in o {
                 result[k as! String] = JSON(v)
             }
             return result
@@ -735,30 +747,30 @@ extension JSON {
     }
 }
 extension JSON : SequenceType {
-    public func generate()->GeneratorOf<(AnyObject,JSON)> {
+    public func generate()->AnyGenerator<(AnyObject,JSON)> {
         switch _value {
         case let o as NSArray:
             var i = -1
-            return GeneratorOf<(AnyObject, JSON)> {
+            return anyGenerator {
                 if ++i == o.count { return nil }
                 return (i, JSON(o[i]))
             }
         case let o as NSDictionary:
-            var ks = o.allKeys.reverse()
-            return GeneratorOf<(AnyObject, JSON)> {
+            var ks = Array(o.allKeys.reverse())
+            return anyGenerator {
                 if ks.isEmpty { return nil }
                 let k = ks.removeLast() as! String
                 return (k, JSON(o.valueForKey(k)!))
             }
         default:
-            return GeneratorOf<(AnyObject, JSON)>{ nil }
+            return anyGenerator{ nil }
         }
     }
     public func mutableCopyOfTheObject() -> AnyObject {
         return _value.mutableCopy()
     }
 }
-extension JSON : Printable {
+extension JSON : CustomStringConvertible {
     /// stringifies self.
     /// if pretty:true it pretty prints
     public func toString(pretty:Bool=false)->String {
@@ -785,18 +797,20 @@ extension JSON : Printable {
         case let o as NSString:
             return o.debugDescription
         default:
-            let opts = pretty
-                ? NSJSONWritingOptions.PrettyPrinted : nil
-            if let data = NSJSONSerialization.dataWithJSONObject(
-                _value, options:opts, error:nil
-                ) as NSData? {
-                    if let nsstring = NSString(
-                        data:data, encoding:NSUTF8StringEncoding
-                        ) as NSString? {
-                            return nsstring as String
-                    }
+            let opts:NSJSONWritingOptions? = pretty ? NSJSONWritingOptions.PrettyPrinted : nil
+            do {
+                if let data = try NSJSONSerialization.dataWithJSONObject(
+                    _value, options:opts!) as NSData? {
+                        if let nsstring = NSString(
+                            data:data, encoding:NSUTF8StringEncoding
+                            ) as NSString? {
+                                return nsstring as String
+                        }
+                }
+            } catch {
+                 return "YOU ARE NOT SUPPOSED TO SEE THIS!"
             }
-            return "YOU ARE NOT SUPPOSED TO SEE THIS!"
+           return "YOU ARE NOT SUPPOSED TO SEE THIS!"
         }
     }
     public var description:String { return toString() }
