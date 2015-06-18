@@ -231,16 +231,27 @@ class NetKit: HTTPLayerDelegate {
 
     func post(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) { //contentType, postData
         var fullURL = self.getFullURL(url)
-     
+        println("FullURL=\(fullURL)")
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.POST) {
-            self.setHeaders(request, headers)
-            if let concreteData: AnyObject = data {
-                if let type = self.detectDataType(concreteData) {
-                    self.setContentType(request, type)
-                }
+//            self.setHeaders(request, headers)
+//            if let concreteData: AnyObject = data {
+//                if let type = self.detectDataType(concreteData) {
+//                    self.setContentType(request, type)
+//                }
+                if let json = data! as? JSON {
 
-                request.HTTPBody = concreteData.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
-            }          
+                    let text = json.toString(pretty: true) as String
+                    println("BODY=\(text)")
+                    let data = text.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)! as NSData
+                    request.HTTPBody = data
+                    
+                    request.setValue("application/json",  forHTTPHeaderField:"Content-Type")
+                }
+//                else {
+//                    request.HTTPBody = concreteData.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
+//                }
+
+//            }          
             var httpLayer = HTTPLayer(completionHandler, errorHandler)
             httpLayer.delegate = self
             httpLayer.request(request)
@@ -284,7 +295,8 @@ class NetKit: HTTPLayerDelegate {
     }
 
     private func setContentType(request: NSMutableURLRequest, _ type: NKContentType) {
-        request.setValue("Content-Type",  forHTTPHeaderField:type.rawValue)
+        println("Set content type: \(type.rawValue)")
+        request.setValue(type.rawValue,  forHTTPHeaderField:"Content-Type")
     }
 
     private func detectDataType(data: AnyObject) -> NKContentType? {
@@ -563,6 +575,9 @@ extension JSON {
                 ]))
         }
     }
+
+
+    
     /// access json data object
     public var data:AnyObject? {
         return self.isError ? nil : self._value
@@ -761,6 +776,12 @@ extension JSON : SequenceType {
 extension JSON : Printable {
     /// stringifies self.
     /// if pretty:true it pretty prints
+    
+    public func dataUsingEncoding(encoding:NSStringEncoding, allowLossyConversion: Bool) -> NSData? {
+        let text = self.toString(pretty: false)
+        return text.dataUsingEncoding(encoding, allowLossyConversion: allowLossyConversion)
+    }
+    
     public func toString(pretty:Bool=false)->String {
         switch _value {
         case is NSError: return "\(_value)"
