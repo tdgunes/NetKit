@@ -154,10 +154,12 @@ enum NKContentType: String  {
 protocol NKDelegate {
     func didFailed(nkerror:NKError, nserror:NSError?)
     func didSucceed(response:NKResponse)
+    func progress(percent:Float)
 }
 
 typealias CompletionHandler = (NKResponse)->()
 typealias ErrorHandler = (NKError, NSError?)->()
+typealias Progress = (percent:Float)->()
 
 class NKResponse {
     var json: JSON?
@@ -182,25 +184,25 @@ class NetKit: HTTPLayerDelegate {
         self.baseURL = ""
     }
 
-    func request(type: HTTPMethod, url: String?=nil, data: AnyObject? = nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
+    func request(type: HTTPMethod, url: String?=nil, data: AnyObject? = nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil,progress: Progress? = nil) {
         var fullURL = self.getFullURL(url)
         switch type {
         case .POST:
-            self.post(data: data, url:url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            self.post(data: data, url:url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler, progress: progress)
             break
         case .PUT:
-            self.put(data: data, url:url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            self.put(data: data, url:url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler, progress: progress)
             break
         case .GET:
-            self.get(url: url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            self.get(url: url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler, progress: progress)
             break
         case .DELETE:
-            self.delete(url: url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler)
+            self.delete(url: url, headers:headers, completionHandler: completionHandler, errorHandler: errorHandler, progress: progress)
             break
         }
     }
 
-    func put(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
+    func put(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil,progress: Progress? = nil) {
         var fullURL = self.getFullURL(url)
 
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.POST) {
@@ -212,24 +214,24 @@ class NetKit: HTTPLayerDelegate {
 
                 request.HTTPBody = concreteData.dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)
             }          
-            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            var httpLayer = HTTPLayer(completionHandler, errorHandler, progress)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
     }
 
-    func get(url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
+    func get(url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil,progress: Progress? = nil) {
         var fullURL = self.getFullURL(url)
 
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.GET) {
             self.setHeaders(request, headers)
-            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            var httpLayer = HTTPLayer(completionHandler, errorHandler, progress)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
     }
 
-    func post(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) { //contentType, postData
+    func post(data: AnyObject? = nil, url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil,progress: Progress? = nil) { //contentType, postData
         var fullURL = self.getFullURL(url)
         println("FullURL=\(fullURL)")
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.POST) {
@@ -252,18 +254,18 @@ class NetKit: HTTPLayerDelegate {
 //                }
 
 //            }          
-            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            var httpLayer = HTTPLayer(completionHandler, errorHandler, progress)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
     }
 
-    func delete(url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil) {
+    func delete(url: String?=nil, headers: [String:String]?=nil, completionHandler: CompletionHandler? = nil, errorHandler: ErrorHandler? = nil, progress: Progress? = nil) {
         var fullURL = self.getFullURL(url)
 
         if let request = self.generateURLRequest(fullURL, method: HTTPMethod.DELETE) {
             self.setHeaders(request, headers)
-            var httpLayer = HTTPLayer(completionHandler, errorHandler)
+            var httpLayer = HTTPLayer(completionHandler, errorHandler, progress)
             httpLayer.delegate = self
             httpLayer.request(request)
         }
@@ -279,6 +281,10 @@ class NetKit: HTTPLayerDelegate {
         self.delegate?.didFailed(.HasNSError, nserror:error)
     }
 
+    func progress(percent: Float) {
+        self.delegate?.progress(percent)
+    }
+    
 
     private func getFullURL(url: String?) -> String {
         if let concreteURL = url {
@@ -363,6 +369,7 @@ class Logger {
 protocol HTTPLayerDelegate {
     func requestFailWithError(error:NSError)
     func requestDidFinish(response:NKResponse)
+    func progress(percent:Float)
 }
 
 
@@ -372,15 +379,20 @@ class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate 
     var delegate: HTTPLayerDelegate?
     var completionHandler: CompletionHandler?
     var errorHandler: ErrorHandler?
+    var progress: Progress?
     var status: HTTPStatus?
-
-    init(_ completionHandler: CompletionHandler?, _ errorHandler: ErrorHandler?) {
+    var expectedDownloadSize: Int?
+    
+    init(_ completionHandler: CompletionHandler?, _ errorHandler: ErrorHandler?, _ progress: Progress?) {
         self.completionHandler = completionHandler
         self.errorHandler = errorHandler
+        self.progress = progress
     }
 
 
     func request(urlRequest:NSMutableURLRequest){
+        urlRequest.setValue("", forHTTPHeaderField: "Accept-Encoding")
+        
         let conn = NSURLConnection(request:urlRequest, delegate: self, startImmediately: true)
     }
     
@@ -388,10 +400,29 @@ class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate 
         responseData = NSMutableData()
         let httpResponse = response as! NSHTTPURLResponse
         status = HTTPStatus(rawValue: httpResponse.statusCode)
+        
+        
+        NSLog("%@", httpResponse.allHeaderFields)
+        
+        if status == .OK {
+            self.expectedDownloadSize = Int(httpResponse.expectedContentLength)
+            println("NKit: Expected Download Size: \(self.expectedDownloadSize)")
+        }
     }
     
     func connection(connection: NSURLConnection, didReceiveData data: NSData) {
         responseData.appendData(data)
+        if let expectedSize = self.expectedDownloadSize {
+            println("NKit: responseData length \(self.responseData.length)")
+            let percent = Float(100 / self.expectedDownloadSize! * self.responseData.length)
+
+            self.delegate?.progress(percent)
+            
+            if let handler = self.progress {
+                handler(percent: percent)
+            }
+        }
+
     }
     
     func connectionDidFinishLoading(connection: NSURLConnection) {
