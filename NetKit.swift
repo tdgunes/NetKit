@@ -414,7 +414,7 @@ class HTTPLayer: NSObject, NSURLConnectionDelegate, NSURLConnectionDataDelegate 
         responseData.appendData(data)
         if let expectedSize = self.expectedDownloadSize {
             println("NKit: responseData length \(self.responseData.length)")
-            let percent = Float(100 / self.expectedDownloadSize! * self.responseData.length)
+            let percent = Float(self.responseData.length) / Float(expectedSize)
 
             self.delegate?.progress(percent)
             
